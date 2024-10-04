@@ -360,6 +360,9 @@ def configure_search_types():
 
 @schedule.repeat(schedule.every(2).minutes)
 def upload_telemetry():
+    if not state:
+        return
+
     if telemetry_disabled(state.config.app) or not state.telemetry:
         return
 
