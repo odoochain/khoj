@@ -16,7 +16,9 @@
         "windowswatch": "nodemon --watch . --ext js,jsx,ts,tsx,css --ignore 'out/**/*' --exec 'yarn windowsexport'",
         "windowscollectstatic": "cd ..\\..\\.. && .\\.venv\\Scripts\\Activate.bat && py .\\src\\khoj\\manage.py collectstatic --noinput && .\\.venv\\Scripts\\deactivate.bat && cd ..",
         "windowsexport": "yarn build && xcopy out ..\\..\\khoj\\interface\\built /E /Y && yarn windowscollectstatic",
-        "prepare": "husky"
+        "prepare": "husky",
+        "windowsexport2": "xcopy out ..\\..\\khoj\\interface\\built /E /Y",
+        "windowsexport3": "cd ..\\..\\.. && python .\\src\\khoj\\manage.py collectstatic"
     },
     "dependencies": {
         "@hookform/resolvers": "^3.9.0",

@@ -21,8 +21,6 @@ from khoj.utils.helpers import in_debug_mode, is_env_var_true
 warnings.filterwarnings("ignore", message=r"snapshot_download.py has been made private", category=FutureWarning)
 warnings.filterwarnings("ignore", message=r"legacy way to download files from the HF hub,", category=FutureWarning)
 
-
-import uvicorn
 import django
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
@@ -212,18 +210,37 @@ def set_state(args):
 
 def start_server(app, host=None, port=None, socket=None):
     logger.info("🌖 Khoj is ready to use")
-    if socket:
-        uvicorn.run(app, proxy_headers=True, uds=socket, log_level="debug", use_colors=True, log_config=None)
+    if os.name == 'nt' and socket: # todo
+        from waitress import serve
+        if socket:
+            # 创建 Unix Domain Socket
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            socket_path = '/tmp/myapp.sock'  # 你可以根据需要更改这个路径
+            try:
+                sock.bind(socket_path)
+            except OSError as e:
+                print(f"Failed to bind to {socket_path}: {e}")
+                sys.exit(1)
+
+            # 运行 Waitress 服务器
+            serve(app, unix_socket=sock, _quiet=False, _socket_timeout=60)
+        else:
+            serve(app, host=host, port=port, _quiet=False)
     else:
-        uvicorn.run(
-            app,
-            host=host,
-            port=port,
-            log_level="debug" if state.verbose > 1 else "info",
-            use_colors=True,
-            log_config=None,
-            timeout_keep_alive=60,
-        )
+        import uvicorn
+        if socket:
+            uvicorn.run(app, proxy_headers=True, uds=socket, log_level="debug", use_colors=True, log_config=None)
+        else:
+            uvicorn.run(
+                app,
+                host=host,
+                port=port,
+                log_level="debug" if state.verbose > 1 else "info",
+                use_colors=True,
+                log_config=None,
+                timeout_keep_alive=60,
+            )
+
     logger.info("🌒 Stopping Khoj")
 
 
