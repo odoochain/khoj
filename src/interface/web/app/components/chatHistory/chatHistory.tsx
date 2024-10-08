@@ -15,7 +15,7 @@ import { InlineLoading } from "../loading/loading";
 
 import { Lightbulb, ArrowDown } from "@phosphor-icons/react";
 
-import ProfileCard from "../profileCard/profileCard";
+import AgentProfileCard from "../profileCard/profileCard";
 import { getIconFromIconName } from "@/app/common/iconUtils";
 import { AgentData } from "@/app/agents/page";
 import React from "react";
@@ -233,18 +233,19 @@ export default function ChatHistory(props: ChatHistoryProps) {
     };
 
     function constructAgentLink() {
-        if (!data || !data.agent || !data.agent.slug) return `/agents`;
-        return `/agents?agent=${data.agent.slug}`;
+        if (!data || !data.agent || !data.agent?.slug) return `/agents`;
+        return `/agents?agent=${data.agent?.slug}`;
     }
 
     function constructAgentName() {
-        if (!data || !data.agent || !data.agent.name) return `Agent`;
-        return data.agent.name;
+        if (!data || !data.agent || !data.agent?.name) return `Agent`;
+        return data.agent?.name;
     }
 
     function constructAgentPersona() {
-        if (!data || !data.agent || !data.agent.persona) return ``;
-        return data.agent.persona;
+        if (!data || !data.agent || !data.agent?.persona)
+            return `Your agent is no longer available. You will be reset to the default agent.`;
+        return data.agent?.persona;
     }
 
     if (!props.conversationId && !props.publicConversationSlug) {
@@ -279,7 +280,7 @@ export default function ChatHistory(props: ChatHistoryProps) {
                                 isMobileWidth={isMobileWidth}
                                 chatMessage={chatMessage}
                                 customClassName="fullHistory"
-                                borderLeftColor={`${data?.agent.color}-500`}
+                                borderLeftColor={`${data?.agent?.color}-500`}
                                 isLastMessage={index === data.chat.length - 1}
                             />
                         ))}
@@ -300,13 +301,13 @@ export default function ChatHistory(props: ChatHistoryProps) {
                                             uploadedImageData: message.uploadedImageData,
                                         }}
                                         customClassName="fullHistory"
-                                        borderLeftColor={`${data?.agent.color}-500`}
+                                        borderLeftColor={`${data?.agent?.color}-500`}
                                     />
                                     {message.trainOfThought &&
                                         constructTrainOfThought(
                                             message.trainOfThought,
                                             index === incompleteIncomingMessageIndex,
-                                            data?.agent.color || "orange",
+                                            data?.agent?.color || "orange",
                                             `${index}trainOfThought`,
                                             message.completed,
                                         )}
@@ -323,7 +324,7 @@ export default function ChatHistory(props: ChatHistoryProps) {
                                             rawQuery: message.rawQuery,
                                         }}
                                         customClassName="fullHistory"
-                                        borderLeftColor={`${data?.agent.color}-500`}
+                                        borderLeftColor={`${data?.agent?.color}-500`}
                                         isLastMessage={true}
                                     />
                                 </React.Fragment>
@@ -343,20 +344,21 @@ export default function ChatHistory(props: ChatHistoryProps) {
                                 uploadedImageData: props.pendingMessage,
                             }}
                             customClassName="fullHistory"
-                            borderLeftColor={`${data?.agent.color}-500`}
+                            borderLeftColor={`${data?.agent?.color}-500`}
                             isLastMessage={true}
                         />
                     )}
                     {data && (
                         <div className={`${styles.agentIndicator} pb-4`}>
                             <div className="relative group mx-2 cursor-pointer">
-                                <ProfileCard
+                                <AgentProfileCard
                                     name={constructAgentName()}
                                     link={constructAgentLink()}
                                     avatar={
-                                        getIconFromIconName(data.agent.icon, data.agent.color) || (
-                                            <Lightbulb />
-                                        )
+                                        getIconFromIconName(
+                                            data.agent?.icon,
+                                            data.agent?.color,
+                                        ) || <Lightbulb />
                                     }
                                     description={constructAgentPersona()}
                                 />

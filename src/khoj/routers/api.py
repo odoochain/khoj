@@ -27,7 +27,13 @@ from khoj.database.adapters import (
     get_user_photo,
     get_user_search_model_or_default,
 )
-from khoj.database.models import ChatModelOptions, KhojUser, SpeechToTextModelOptions
+from khoj.database.models import (
+    Agent,
+    ChatModelOptions,
+    KhojUser,
+    SpeechToTextModelOptions,
+)
+from khoj.processor.conversation import prompts
 from khoj.processor.conversation.anthropic.anthropic_chat import (
     extract_questions_anthropic,
 )
@@ -106,6 +112,7 @@ async def execute_search(
     r: Optional[bool] = False,
     max_distance: Optional[Union[float, None]] = None,
     dedupe: Optional[bool] = True,
+    agent: Optional[Agent] = None,
 ):
     start_time = time.time()
 
@@ -157,6 +164,7 @@ async def execute_search(
                     t,
                     question_embedding=encoded_asymmetric_query,
                     max_distance=max_distance,
+                    agent=agent,
                 )
             ]
 
@@ -333,6 +341,7 @@ async def extract_references_and_questions(
     location_data: LocationData = None,
     send_status_func: Optional[Callable] = None,
     uploaded_image_url: Optional[str] = None,
+    agent: Agent = None,
 ):
     user = request.user.object if request.user.is_authenticated else None
 
@@ -340,17 +349,30 @@ async def extract_references_and_questions(
     compiled_references: List[Any] = []
     inferred_queries: List[str] = []
 
+    agent_has_entries = False
+
+    if agent:
+        agent_has_entries = await sync_to_async(EntryAdapters.agent_has_entries)(agent=agent)
+
     if (
         not ConversationCommand.Notes in conversation_commands
         and not ConversationCommand.Default in conversation_commands
+        and not agent_has_entries
     ):
         yield compiled_references, inferred_queries, q
         return
 
+    # If Notes or Default is not in the conversation command, then the search should be restricted to the agent's knowledge base
+    should_limit_to_agent_knowledge = (
+        ConversationCommand.Notes not in conversation_commands
+        and ConversationCommand.Default not in conversation_commands
+    )
+
     if not await sync_to_async(EntryAdapters.user_has_entries)(user=user):
-        logger.debug("No documents in knowledge base. Use a Khoj client to sync and chat with your docs.")
-        yield compiled_references, inferred_queries, q
-        return
+        if not agent_has_entries:
+            logger.debug("No documents in knowledge base. Use a Khoj client to sync and chat with your docs.")
+            yield compiled_references, inferred_queries, q
+            return
 
     # Extract filter terms from user message
     defiltered_query = q
@@ -367,6 +389,8 @@ async def extract_references_and_questions(
     filters_in_query += " ".join([f'file:"{filter}"' for filter in conversation.file_filters])
     using_offline_chat = False
     logger.debug(f"Filters in query: {filters_in_query}")
+
+    personality_context = prompts.personality_context.format(personality=agent.personality) if agent else ""
 
     # Infer search queries from user message
     with timer("Extracting search queries took", logger):
@@ -392,6 +416,7 @@ async def extract_references_and_questions(
                 location_data=location_data,
                 user=user,
                 max_prompt_size=conversation_config.max_prompt_size,
+                personality_context=personality_context,
             )
         elif conversation_config.model_type == ChatModelOptions.ModelType.OPENAI:
             openai_chat_config = conversation_config.openai_config
@@ -408,6 +433,7 @@ async def extract_references_and_questions(
                 user=user,
                 uploaded_image_url=uploaded_image_url,
                 vision_enabled=vision_enabled,
+                personality_context=personality_context,
             )
         elif conversation_config.model_type == ChatModelOptions.ModelType.ANTHROPIC:
             api_key = conversation_config.openai_config.api_key
@@ -419,6 +445,7 @@ async def extract_references_and_questions(
                 conversation_log=meta_log,
                 location_data=location_data,
                 user=user,
+                personality_context=personality_context,
             )
         elif conversation_config.model_type == ChatModelOptions.ModelType.GOOGLE:
             api_key = conversation_config.openai_config.api_key
@@ -431,6 +458,7 @@ async def extract_references_and_questions(
                 location_data=location_data,
                 max_tokens=conversation_config.max_prompt_size,
                 user=user,
+                personality_context=personality_context,
             )
 
     # Collate search results as context for GPT
@@ -445,13 +473,14 @@ async def extract_references_and_questions(
             n_items = min(n, 3) if using_offline_chat else n
             search_results.extend(
                 await execute_search(
-                    user,
+                    user if not should_limit_to_agent_knowledge else None,
                     f"{query} {filters_in_query}",
                     n=n_items,
                     t=SearchType.All,
                     r=True,
                     max_distance=d,
                     dedupe=False,
+                    agent=agent,
                 )
             )
         search_results = text_search.deduplicated_search_responses(search_results)
