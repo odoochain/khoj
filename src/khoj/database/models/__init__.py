@@ -285,6 +285,7 @@ class TextToImageModelConfig(BaseModel):
     model_name = models.CharField(max_length=200, default="dall-e-3")
     model_type = models.CharField(max_length=200, choices=ModelType.choices, default=ModelType.OPENAI)
     api_key = models.CharField(max_length=200, default=None, null=True, blank=True)
+    api_base_url = models.URLField(max_length=200, default=None, blank=True, null=True)
     openai_config = models.ForeignKey(
         OpenAIProcessorConversationConfig, on_delete=models.CASCADE, default=None, null=True, blank=True
     )

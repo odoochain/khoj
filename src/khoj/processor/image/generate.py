@@ -118,14 +118,19 @@ def generate_image_with_openai(
     improved_image_prompt: str, text_to_image_config: TextToImageModelConfig, text2image_model: str
 ):
     "Generate image using OpenAI API"
-
     # Get the API key from the user's configuration
     if text_to_image_config.api_key:
         api_key = text_to_image_config.api_key
+        api_base_url = text_to_image_config.api_base_url
     elif text_to_image_config.openai_config:
         api_key = text_to_image_config.openai_config.api_key
+        api_base_url = text_to_image_config.openai_config.api_base_url
     elif state.openai_client:
         api_key = state.openai_client.api_key
+        api_base_url = state.openai_client.base_url
+    else:
+        print("no key!")
+        return
     auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
 
     # Generate image using OpenAI API
@@ -136,6 +141,7 @@ def generate_image_with_openai(
         style=OPENAI_IMAGE_GEN_STYLE,
         response_format="b64_json",
         extra_headers=auth_header,
+        # api_base_url=api_base_url,
     )
 
     # Extract the base64 image from the response
