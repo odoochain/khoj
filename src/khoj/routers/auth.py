@@ -58,7 +58,10 @@ if not state.anonymous_mode:
     oauth = OAuth(config)
 
     CONF_URL = "https://accounts.google.com/.well-known/openid-configuration"
-    oauth.register(name="google", server_metadata_url=CONF_URL, client_kwargs={"scope": "openid email profile"})
+    oauth.register(name="google", server_metadata_url=CONF_URL,
+                   client_kwargs={"scope": "openid email profile"},
+                   proxies={"http": os.environ['HTTP_PROXY'], "https": os.environ['HTTPS_PROXY']}
+                   )
 
 
 @auth_router.get("/login")

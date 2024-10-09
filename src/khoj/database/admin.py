@@ -166,6 +166,7 @@ class TextToImageModelOptionsAdmin(admin.ModelAdmin):
         "id",
         "model_name",
         "model_type",
+        "openai_config",
     )
     search_fields = ("id", "model_name", "model_type")
 

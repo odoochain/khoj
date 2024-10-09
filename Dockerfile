@@ -35,7 +35,7 @@ COPY . .
 # Set the PYTHONPATH environment variable in order for it to find the Django app.
 ENV PYTHONPATH=/app/src:$PYTHONPATH
 
-# Go to the directory src/interface/web and export the built Next.js assets
+# Go to the directory src/interface/web and export the built Next.js assets 注意:windows下用cmd环境 yarn windowsexport
 WORKDIR /app/src/interface/web
 RUN bash -c "yarn install --frozen-lockfile --verbose && yarn ciexport && yarn cache clean"
 WORKDIR /app

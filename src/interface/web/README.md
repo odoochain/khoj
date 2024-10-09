@@ -5,13 +5,25 @@ This is a [Next.js](https://nextjs.org/) project.
 First, install the dependencies:
 
 ```bash
-yarn install
+yarn install --frozen-lockfile --verbose
+yarn build 
+
+
 ```
 
 In case you run into any dependency linking issues, you can try running:
 
+```zsh
+xcopy out ..\..\khoj\interface\built /E 
+```
+
 ```bash
 yarn add next
+```
+```bashsupport pro shell script
+cd ../../../
+python .\src\khoj\manage.py collectstatic 
+yarn cache clean
 ```
 
 ### Run the development server:

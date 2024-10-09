@@ -210,7 +210,7 @@ def configure_server(
 
     if ConversationAdapters.has_valid_openai_conversation_config():
         openai_config = ConversationAdapters.get_openai_conversation_config()
-        state.openai_client = openai.OpenAI(api_key=openai_config.api_key)
+        state.openai_client = openai.OpenAI(api_key=openai_config.api_key,base_url=openai_config.api_base_url)
 
     # Initialize Search Models from Config and initialize content
     try:
@@ -360,6 +360,9 @@ def configure_search_types():
 
 @schedule.repeat(schedule.every(2).minutes)
 def upload_telemetry():
+    if not state:
+        return
+
     if telemetry_disabled(state.config.app) or not state.telemetry:
         return
 
