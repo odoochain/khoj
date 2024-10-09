@@ -230,6 +230,20 @@ function AgentCard(props: AgentCardProps) {
         },
     });
 
+    useEffect(() => {
+        form.reset({
+            name: props.data.name,
+            persona: props.data.persona,
+            color: props.data.color,
+            icon: props.data.icon,
+            privacy_level: props.data.privacy_level,
+            chat_model: props.data.chat_model,
+            files: props.data.files,
+            input_tools: props.data.input_tools,
+            output_modes: props.data.output_modes,
+        });
+    }, [props.data]);
+
     if (showModal) {
         window.history.pushState(
             {},
@@ -288,9 +302,7 @@ function AgentCard(props: AgentCardProps) {
                     <Badge
                         icon={<Book />}
                         text={`knowledge`}
-                        hoverText={
-                            "The agent has a custom knowledge base it can use to give you answers."
-                        }
+                        hoverText={`The agent has a custom knowledge base with ${props.data.files.length} documents. It can use them to give you answers.`}
                     />
                 )}
                 <Badge
@@ -348,7 +360,7 @@ function AgentCard(props: AgentCardProps) {
                                         <Popover>
                                             <PopoverTrigger>
                                                 <Button
-                                                    className={`bg-[hsl(var(--background))] w-14 h-14 rounded-xl border dark:border-neutral-700 shadow-sm hover:bg-stone-100 dark:hover:bg-neutral-900`}
+                                                    className={`bg-[hsl(var(--background))] w-10 h-10 p-0 rounded-xl border dark:border-neutral-700 shadow-sm hover:bg-stone-100 dark:hover:bg-neutral-900`}
                                                 >
                                                     <DotsThreeVertical
                                                         className={`w-6 h-6 ${convertColorToTextClass(props.data.color)}`}
@@ -405,7 +417,7 @@ function AgentCard(props: AgentCardProps) {
                                 <div className="float-right">
                                     {props.userProfile ? (
                                         <Button
-                                            className={`bg-[hsl(var(--background))] w-14 h-14 rounded-xl border dark:border-neutral-700 shadow-sm hover:bg-stone-100 dark:hover:bg-neutral-900`}
+                                            className={`bg-[hsl(var(--background))] w-10 h-10 p-0 rounded-xl border dark:border-neutral-700 shadow-sm hover:bg-stone-100 dark:hover:bg-neutral-900`}
                                             onClick={() => openChat(props.data.slug, userData)}
                                         >
                                             <PaperPlaneTilt
@@ -495,7 +507,7 @@ function AgentCard(props: AgentCardProps) {
                                         <Popover>
                                             <PopoverTrigger>
                                                 <Button
-                                                    className={`bg-[hsl(var(--background))] w-14 h-14 rounded-xl border dark:border-neutral-700 shadow-sm hover:bg-stone-100 dark:hover:bg-neutral-900`}
+                                                    className={`bg-[hsl(var(--background))] w-10 h-10 p-0 rounded-xl border dark:border-neutral-700 shadow-sm hover:bg-stone-100 dark:hover:bg-neutral-900`}
                                                 >
                                                     <DotsThreeVertical
                                                         className={`w-6 h-6 ${convertColorToTextClass(props.data.color)}`}
@@ -552,7 +564,7 @@ function AgentCard(props: AgentCardProps) {
                                 <div className="float-right">
                                     {props.userProfile ? (
                                         <Button
-                                            className={`bg-[hsl(var(--background))] w-14 h-14 rounded-xl border dark:border-neutral-700 shadow-sm hover:bg-stone-100 dark:hover:bg-neutral-900`}
+                                            className={`bg-[hsl(var(--background))] w-10 h-10 p-0 rounded-xl border dark:border-neutral-700 shadow-sm hover:bg-stone-100 dark:hover:bg-neutral-900`}
                                             onClick={() => openChat(props.data.slug, userData)}
                                         >
                                             <PaperPlaneTilt
