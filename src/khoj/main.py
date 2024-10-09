@@ -16,7 +16,6 @@ import warnings
 from importlib.metadata import version
 
 from khoj.utils.helpers import in_debug_mode, is_env_var_true
-
 # Ignore non-actionable warnings
 warnings.filterwarnings("ignore", message=r"snapshot_download.py has been made private", category=FutureWarning)
 warnings.filterwarnings("ignore", message=r"legacy way to download files from the HF hub,", category=FutureWarning)
