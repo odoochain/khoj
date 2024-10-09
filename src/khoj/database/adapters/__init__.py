@@ -556,18 +556,26 @@ class AgentAdapters:
 
     @staticmethod
     async def aget_readonly_agent_by_slug(agent_slug: str, user: KhojUser):
-        return await Agent.objects.filter(
-            (Q(slug__iexact=agent_slug.lower()))
-            & (
-                Q(privacy_level=Agent.PrivacyLevel.PUBLIC)
-                | Q(privacy_level=Agent.PrivacyLevel.PROTECTED)
-                | Q(creator=user)
+        return (
+            await Agent.objects.filter(
+                (Q(slug__iexact=agent_slug.lower()))
+                & (
+                    Q(privacy_level=Agent.PrivacyLevel.PUBLIC)
+                    | Q(privacy_level=Agent.PrivacyLevel.PROTECTED)
+                    | Q(creator=user)
+                )
             )
-        ).afirst()
+            .prefetch_related("creator", "chat_model", "fileobject_set")
+            .afirst()
+        )
 
     @staticmethod
     async def adelete_agent_by_slug(agent_slug: str, user: KhojUser):
         agent = await AgentAdapters.aget_agent_by_slug(agent_slug, user)
+
+        async for entry in Entry.objects.filter(agent=agent).aiterator():
+            await entry.adelete()
+
         if agent:
             await agent.adelete()
             return True
@@ -575,15 +583,23 @@ class AgentAdapters:
 
     @staticmethod
     async def aget_agent_by_slug(agent_slug: str, user: KhojUser):
-        return await Agent.objects.filter(
-            (Q(slug__iexact=agent_slug.lower())) & (Q(privacy_level=Agent.PrivacyLevel.PUBLIC) | Q(creator=user))
-        ).afirst()
+        return (
+            await Agent.objects.filter(
+                (Q(slug__iexact=agent_slug.lower())) & (Q(privacy_level=Agent.PrivacyLevel.PUBLIC) | Q(creator=user))
+            )
+            .prefetch_related("creator", "chat_model", "fileobject_set")
+            .afirst()
+        )
 
     @staticmethod
     async def aget_agent_by_name(agent_name: str, user: KhojUser):
-        return await Agent.objects.filter(
-            (Q(name__iexact=agent_name.lower())) & (Q(privacy_level=Agent.PrivacyLevel.PUBLIC) | Q(creator=user))
-        ).afirst()
+        return (
+            await Agent.objects.filter(
+                (Q(name__iexact=agent_name.lower())) & (Q(privacy_level=Agent.PrivacyLevel.PUBLIC) | Q(creator=user))
+            )
+            .prefetch_related("creator", "chat_model", "fileobject_set")
+            .afirst()
+        )
 
     @staticmethod
     def get_agent_by_slug(slug: str, user: KhojUser = None):
@@ -810,7 +826,7 @@ class ConversationAdapters:
         user: KhojUser, client_application: ClientApplication = None, agent_slug: str = None, title: str = None
     ):
         if agent_slug:
-            agent = await AgentAdapters.aget_agent_by_slug(agent_slug, user)
+            agent = await AgentAdapters.aget_readonly_agent_by_slug(agent_slug, user)
             if agent is None:
                 raise HTTPException(status_code=400, detail="No such agent currently exists.")
             return await Conversation.objects.acreate(user=user, client=client_application, agent=agent, title=title)
@@ -822,7 +838,7 @@ class ConversationAdapters:
         user: KhojUser, client_application: ClientApplication = None, agent_slug: str = None, title: str = None
     ):
         if agent_slug:
-            agent = AgentAdapters.get_agent_by_slug(agent_slug, user)
+            agent = AgentAdapters.aget_readonly_agent_by_slug(agent_slug, user)
             if agent is None:
                 raise HTTPException(status_code=400, detail="No such agent currently exists.")
             return Conversation.objects.create(user=user, client=client_application, agent=agent, title=title)

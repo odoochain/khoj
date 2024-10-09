@@ -208,7 +208,7 @@ def get_next_url(request: Request) -> str:
 def construct_chat_history(conversation_history: dict, n: int = 4, agent_name="AI") -> str:
     chat_history = ""
     for chat in conversation_history.get("chat", [])[-n:]:
-        if chat["by"] == "khoj" and chat["intent"].get("type") in ["remember", "reminder"]:
+        if chat["by"] == "khoj" and chat["intent"].get("type") in ["remember", "reminder", "summarize"]:
             chat_history += f"User: {chat['intent']['query']}\n"
             chat_history += f"{agent_name}: {chat['message']}\n"
         elif chat["by"] == "khoj" and ("text-to-image" in chat["intent"].get("type")):
@@ -348,11 +348,17 @@ async def aget_relevant_information_sources(
                 final_response.append(ConversationCommand(llm_suggested_tool))
 
         if is_none_or_empty(final_response):
-            final_response = [ConversationCommand.Default]
+            if len(agent_tools) == 0:
+                final_response = [ConversationCommand.Default]
+            else:
+                final_response = [ConversationCommand.General]
         return final_response
     except Exception as e:
         logger.error(f"Invalid response for determining relevant tools: {response}")
-        return [ConversationCommand.Default]
+        if len(agent_tools) == 0:
+            final_response = [ConversationCommand.Default]
+        else:
+            final_response = agent_tools
 
 
 async def aget_relevant_output_modes(
@@ -568,7 +574,12 @@ async def extract_relevant_info(q: str, corpus: str, subscribed: bool, agent: Ag
 
 
 async def extract_relevant_summary(
-    q: str, corpus: str, subscribed: bool = False, uploaded_image_url: str = None, agent: Agent = None
+    q: str,
+    corpus: str,
+    conversation_history: dict,
+    subscribed: bool = False,
+    uploaded_image_url: str = None,
+    agent: Agent = None,
 ) -> Union[str, None]:
     """
     Extract relevant information for a given query from the target corpus
@@ -581,8 +592,11 @@ async def extract_relevant_summary(
         prompts.personality_context.format(personality=agent.personality) if agent and agent.personality else ""
     )
 
+    chat_history = construct_chat_history(conversation_history)
+
     extract_relevant_information = prompts.extract_relevant_summary.format(
         query=q,
+        chat_history=chat_history,
         corpus=corpus.strip(),
         personality_context=personality_context,
     )

@@ -209,14 +209,17 @@ def chat_history(
 
     agent_metadata = None
     if conversation.agent:
-        agent_metadata = {
-            "slug": conversation.agent.slug,
-            "name": conversation.agent.name,
-            "isCreator": conversation.agent.creator == user,
-            "color": conversation.agent.style_color,
-            "icon": conversation.agent.style_icon,
-            "persona": conversation.agent.personality,
-        }
+        if conversation.agent.privacy_level == Agent.PrivacyLevel.PRIVATE:
+            conversation.agent = None
+        else:
+            agent_metadata = {
+                "slug": conversation.agent.slug,
+                "name": conversation.agent.name,
+                "isCreator": conversation.agent.creator == user,
+                "color": conversation.agent.style_color,
+                "icon": conversation.agent.style_icon,
+                "persona": conversation.agent.personality,
+            }
 
     meta_log = conversation.conversation_log
     meta_log.update(
@@ -265,14 +268,17 @@ def get_shared_chat(
 
     agent_metadata = None
     if conversation.agent:
-        agent_metadata = {
-            "slug": conversation.agent.slug,
-            "name": conversation.agent.name,
-            "isCreator": conversation.agent.creator == user,
-            "color": conversation.agent.style_color,
-            "icon": conversation.agent.style_icon,
-            "persona": conversation.agent.personality,
-        }
+        if conversation.agent.privacy_level == Agent.PrivacyLevel.PRIVATE:
+            conversation.agent = None
+        else:
+            agent_metadata = {
+                "slug": conversation.agent.slug,
+                "name": conversation.agent.name,
+                "isCreator": conversation.agent.creator == user,
+                "color": conversation.agent.style_color,
+                "icon": conversation.agent.style_icon,
+                "persona": conversation.agent.personality,
+            }
 
     meta_log = conversation.conversation_log
     scrubbed_title = conversation.title if conversation.title else conversation.slug
@@ -758,7 +764,12 @@ async def chat(
                         yield result
 
                     response = await extract_relevant_summary(
-                        q, contextual_data, subscribed=subscribed, uploaded_image_url=uploaded_image_url, agent=agent
+                        q,
+                        contextual_data,
+                        conversation_history=meta_log,
+                        subscribed=subscribed,
+                        uploaded_image_url=uploaded_image_url,
+                        agent=agent,
                     )
                     response_log = str(response)
                     async for result in send_llm_response(response_log):
@@ -1238,7 +1249,11 @@ async def get_chat(
                         yield result
 
                     response = await extract_relevant_summary(
-                        q, contextual_data, subscribed=subscribed, uploaded_image_url=uploaded_image_url
+                        q,
+                        contextual_data,
+                        conversation_history=meta_log,
+                        subscribed=subscribed,
+                        uploaded_image_url=uploaded_image_url,
                     )
                     response_log = str(response)
                     async for result in send_llm_response(response_log):

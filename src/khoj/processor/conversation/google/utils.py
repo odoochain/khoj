@@ -4,15 +4,13 @@ from threading import Thread
 
 import google.generativeai as genai
 from google.generativeai.types.answer_types import FinishReason
-from google.generativeai.types.generation_types import (
-    GenerateContentResponse,
-    StopCandidateException,
-)
+from google.generativeai.types.generation_types import StopCandidateException
 from google.generativeai.types.safety_types import (
     HarmBlockThreshold,
     HarmCategory,
     HarmProbability,
 )
+from langchain.schema import ChatMessage
 from tenacity import (
     before_sleep_log,
     retry,
@@ -22,11 +20,12 @@ from tenacity import (
 )
 
 from khoj.processor.conversation.utils import ThreadedGenerator
+from khoj.utils.helpers import is_none_or_empty
 
 logger = logging.getLogger(__name__)
 
 
-DEFAULT_MAX_TOKENS_GEMINI = 8192
+MAX_OUTPUT_TOKENS_GEMINI = 8192
 
 
 @retry(
@@ -36,13 +35,12 @@ DEFAULT_MAX_TOKENS_GEMINI = 8192
     reraise=True,
 )
 def gemini_completion_with_backoff(
-    messages, system_prompt, model_name, temperature=0, api_key=None, model_kwargs=None, max_tokens=None
+    messages, system_prompt, model_name, temperature=0, api_key=None, model_kwargs=None
 ) -> str:
     genai.configure(api_key=api_key)
-    max_tokens = max_tokens or DEFAULT_MAX_TOKENS_GEMINI
     model_kwargs = model_kwargs or dict()
     model_kwargs["temperature"] = temperature
-    model_kwargs["max_output_tokens"] = max_tokens
+    model_kwargs["max_output_tokens"] = MAX_OUTPUT_TOKENS_GEMINI
     model = genai.GenerativeModel(
         model_name,
         generation_config=model_kwargs,
@@ -88,28 +86,24 @@ def gemini_chat_completion_with_backoff(
     temperature,
     api_key,
     system_prompt,
-    max_prompt_size=None,
     completion_func=None,
     model_kwargs=None,
 ):
     g = ThreadedGenerator(compiled_references, online_results, completion_func=completion_func)
     t = Thread(
         target=gemini_llm_thread,
-        args=(g, messages, system_prompt, model_name, temperature, api_key, max_prompt_size, model_kwargs),
+        args=(g, messages, system_prompt, model_name, temperature, api_key, model_kwargs),
     )
     t.start()
     return g
 
 
-def gemini_llm_thread(
-    g, messages, system_prompt, model_name, temperature, api_key, max_prompt_size=None, model_kwargs=None
-):
+def gemini_llm_thread(g, messages, system_prompt, model_name, temperature, api_key, model_kwargs=None):
     try:
         genai.configure(api_key=api_key)
-        max_tokens = max_prompt_size or DEFAULT_MAX_TOKENS_GEMINI
         model_kwargs = model_kwargs or dict()
         model_kwargs["temperature"] = temperature
-        model_kwargs["max_output_tokens"] = max_tokens
+        model_kwargs["max_output_tokens"] = MAX_OUTPUT_TOKENS_GEMINI
         model_kwargs["stop_sequences"] = ["Notes:\n["]
         model = genai.GenerativeModel(
             model_name,
@@ -190,3 +184,23 @@ def generate_safety_response(safety_ratings):
     return safety_response_choice.format(
         category=max_safety_category, probability=max_safety_rating.probability.name, discomfort_level=discomfort_level
     )
+
+
+def format_messages_for_gemini(messages: list[ChatMessage], system_prompt: str = None) -> tuple[list[str], str]:
+    if len(messages) == 1:
+        messages[0].role = "user"
+        return messages, system_prompt
+
+    for message in messages:
+        if message.role == "assistant":
+            message.role = "model"
+
+    # Extract system message
+    system_prompt = system_prompt or ""
+    for message in messages.copy():
+        if message.role == "system":
+            system_prompt += message.content
+            messages.remove(message)
+    system_prompt = None if is_none_or_empty(system_prompt) else system_prompt
+
+    return messages, system_prompt
