@@ -18,7 +18,7 @@
         "windowsexport": "yarn build && xcopy out ..\\..\\khoj\\interface\\built /E /Y && yarn windowscollectstatic",
         "prepare": "husky",
         "windowsexport2": "xcopy out ..\\..\\khoj\\interface\\built /E /Y",
-        "windowscicollectstatic2": "cd ..\\..\\.. && conda activate zen17 && python .\\src\\khoj\\manage.py collectstatic"
+        "windowscicollectstatic2": "cd ..\\..\\.. && conda activate zen && python .\\src\\khoj\\manage.py collectstatic"
     },
     "dependencies": {
         "@hookform/resolvers": "^3.9.0",
