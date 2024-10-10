@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from openai import OpenAI
+from openai import OpenAI, Client
 from whisper import Whisper
 
 from khoj.database.models import ProcessLock
@@ -20,7 +20,7 @@ config = FullConfig()
 search_models = SearchModels()
 embeddings_model: Dict[str, EmbeddingsModel] = None
 cross_encoder_model: Dict[str, CrossEncoderModel] = None
-openai_client: OpenAI = None
+openai_client: Client = None
 offline_chat_processor_config: OfflineChatProcessorModel = None
 whisper_model: Whisper = None
 config_file: Path = None

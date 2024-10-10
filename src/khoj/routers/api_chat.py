@@ -569,6 +569,7 @@ async def chat(
     image = body.image
 
     async def event_generator(q: str, image: str):
+        global intent_type, improved_image_prompt
         start_time = time.perf_counter()
         ttft = None
         chat_metadata: dict = {}

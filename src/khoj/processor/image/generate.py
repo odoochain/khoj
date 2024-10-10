@@ -3,9 +3,10 @@ import io
 import logging
 import time
 from typing import Any, Callable, Dict, List, Optional
-
+# https://github.com/langchain-ai/langchain/pull/14317/files
 import openai
 import requests
+from openai import OpenAIError, BadRequestError, APIConnectionError  # 确保导入了这些异常类
 
 from khoj.database.adapters import ConversationAdapters
 from khoj.database.models import Agent, KhojUser, TextToImageModelConfig
@@ -75,6 +76,7 @@ async def text_to_image(
             yield {ChatEvent.STATUS: event}
 
     # Generate image using the configured model and API
+
     with timer(f"Generate image with {text_to_image_config.model_type}", logger):
         try:
             if text_to_image_config.model_type == TextToImageModelConfig.ModelType.OPENAI:
@@ -83,17 +85,18 @@ async def text_to_image(
                 webp_image_bytes = generate_image_with_stability(image_prompt, text_to_image_config, text2image_model)
             elif text_to_image_config.model_type == TextToImageModelConfig.ModelType.REPLICATE:
                 webp_image_bytes = generate_image_with_replicate(image_prompt, text_to_image_config, text2image_model)
-        except openai.OpenAIError or openai.BadRequestError or openai.APIConnectionError as e:
-            if "content_policy_violation" in e.message:
-                logger.error(f"Image Generation blocked by OpenAI: {e}")
-                status_code = e.status_code  # type: ignore
-                message = f"Image generation blocked by OpenAI: {e.message}"  # type: ignore
+        except (OpenAIError, BadRequestError, APIConnectionError) as e:
+            error_message = get_error_message(e)  # 获取异常的字符串表示
+            if "content_policy_violation" in error_message:
+                logger.error(f"Image Generation blocked by OpenAI: {error_message}")
+                status_code = getattr(e, 'status_code', None)  # 尝试安全地获取状态码
+                message = f"Image generation blocked by OpenAI: {error_message}"
                 yield image_url or image, status_code, message, intent_type.value
                 return
             else:
                 logger.error(f"Image Generation failed with {e}", exc_info=True)
-                message = f"Image generation failed with OpenAI error: {e.message}"  # type: ignore
-                status_code = e.status_code  # type: ignore
+                message = f"Image generation failed with OpenAI error: {error_message}"
+                status_code = getattr(e, 'status_code', None)  # 尝试安全地获取状态码
                 yield image_url or image, status_code, message, intent_type.value
                 return
         except requests.RequestException as e:
@@ -102,7 +105,13 @@ async def text_to_image(
             status_code = 502
             yield image_url or image, status_code, message, intent_type.value
             return
-
+        except Exception as e:
+            # 捕获所有其他异常
+            logger.error(f"Unexpected error during image generation: {e}", exc_info=True)
+            message = f"Unexpected error during image generation: {get_error_message(e)}"
+            status_code = 500
+            yield image_url or "", status_code, message, intent_type.value
+            return
     # Decide how to store the generated image
     with timer("Upload image to S3", logger):
         image_url = upload_image(webp_image_bytes, user.uuid)
@@ -110,10 +119,25 @@ async def text_to_image(
         intent_type = ImageIntentType.TEXT_TO_IMAGE2
     else:
         intent_type = ImageIntentType.TEXT_TO_IMAGE_V3
-        image = base64.b64encode(webp_image_bytes).decode("utf-8")
+        # 将 WebP 图像转换为 base64 编码的字符串
+        try:
+            image = base64.b64encode(webp_image_bytes).decode("utf-8")
+        except TypeError as e:
+            print(f"Error encoding image to base64: {e}")
+            return  # 如果编码失败，返回 None 或者其他适当的值表示失败
 
     yield image_url or image, status_code, image_prompt, intent_type.value
 
+def get_error_message(e: Exception) -> str:
+    """从异常中获取错误消息，如果异常没有 message 属性，则返回异常的字符串表示。"""
+    if hasattr(e, 'message'):
+        return e.message
+    elif hasattr(e, 'detail'):
+        return e.detail
+    elif hasattr(e, 'errors') and isinstance(e.errors, list) and e.errors:
+        return e.errors[0].get('message', 'Unknown error occurred')
+    else:
+        return str(e)
 
 def generate_image_with_openai(
     improved_image_prompt: str, text_to_image_config: TextToImageModelConfig, text2image_model: str
@@ -132,23 +156,56 @@ def generate_image_with_openai(
     else:
         print("no key!")
         return
-    auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    # auth_header = {"Authorization": f"Bearer {api_key}"} if api_key else {}
 
-    # Generate image using OpenAI API
     OPENAI_IMAGE_GEN_STYLE = "vivid"
-    response = state.openai_client.images.generate(
-        prompt=improved_image_prompt,
-        model=text2image_model,
-        style=OPENAI_IMAGE_GEN_STYLE,
-        response_format="b64_json",
-        extra_headers=auth_header,
-        # api_base_url=api_base_url,
-    )
+    # 配置 OpenAI 客户端
+    client = openai.Client(api_key=api_key, base_url=api_base_url)
 
+    try:
+        # 使用 OpenAI API 生成图像 不再用state.openai_client
+        response = client.images.generate(
+            model=text2image_model,
+            prompt=improved_image_prompt,
+            size="1024x1024",  # 或者其他需要的尺寸
+            response_format="b64_json",
+            # style=[OPENAI_IMAGE_GEN_STYLE],
+            # style="vivid"  # 如果适用的话
+            n = 1,  # 如果只需要一张图片
+        )
+    except (openai.OpenAIError, openai.BadRequestError, openai.APIConnectionError) as e:
+        # 处理OpenAI相关的异常
+        error_message = get_error_message(e)
+        print(f"Error generating image with OpenAI: {error_message}")
+        return
+    except Exception as e:
+        # 捕获并处理其他异常
+        error_message = get_error_message(e)
+        print(f"Unexpected error during image generation: {error_message}")
+        return
+    # 检查响应数据是否有效
+    if not response or not response.data or not response.data[0] or not response.data[0].b64_json:
+        print("Invalid or empty response from OpenAI")
+        return
     # Extract the base64 image from the response
-    image = response.data[0].b64_json
+    b64_json = response.data[0].b64_json
     # Decode base64 png and convert it to webp for faster loading
-    return convert_image_to_webp(base64.b64decode(image))
+    # 解码 base64 png 并将其转换为 webp 以便更快地加载
+    webp_image_bytes = convert_image_to_webp(base64.b64decode(b64_json))
+
+    # 检查 webp_image_bytes 是否有效
+    if webp_image_bytes is None:
+        print("Failed to convert image to WebP format.")
+        return None  # 如果转换失败，返回 None 或者其他适当的值表示失败
+
+    # 将 WebP 图像转换为 base64 编码的字符串
+    try:
+        image = base64.b64encode(webp_image_bytes).decode("utf-8")
+    except TypeError as e:
+        print(f"Error encoding image to base64: {e}")
+        return None  # 如果编码失败，返回 None 或者其他适当的值表示失败
+
+    return image
 
 
 def generate_image_with_stability(
